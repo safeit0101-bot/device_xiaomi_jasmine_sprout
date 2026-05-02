@@ -1,0 +1,83 @@
+name: TECHNICAL PRINCE MASTER BUILD
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: CHECKING SCRIPT VERSION
+        run: echo "Yeh ekdum nayi aur sahi script hai. Agar GitLab link fail hua toh pata chal jayega!"
+
+      - name: Free Disk Space
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
+          android: true
+
+      - name: Install Tools
+        run: |
+          sudo apt update
+          sudo apt install -y git-core gnupg flex bison build-essential zip curl zlib1g-dev libc6-dev-i386 libncurses5-dev x11proto-core-dev libx11-dev lib32z1-dev libgl1-mesa-dev libxml2-utils xsltproc unzip fontconfig bc python3
+
+      - name: Setup Repo
+        run: |
+          mkdir -p ~/bin
+          curl https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
+          chmod a+x ~/bin/repo
+          sudo ln -sf ~/bin/repo /usr/bin/repo
+
+      - name: Sync OrangeFox Engine (Official GitLab Link)
+        run: |
+          mkdir -p ~/orangefox_workspace
+          cd ~/orangefox_workspace
+          git config --global user.name "TechnicalPrince"
+          git config --global user.email "technicalprince@example.com"
+          # Yahan 100% GitLab ka link hai!
+          repo init -u https://gitlab.com/OrangeFox/Manifest.git -b fox_11.0 --depth=1
+          repo sync -c -j$(nproc --all) --force-sync --no-clone-bundle --no-tags
+
+      - name: Checkout Device Tree FROM MY ACCOUNT
+        uses: actions/checkout@v4
+        with:
+          path: orangefox_workspace/device/xiaomi/jasmine_sprout
+
+      - name: Apply Technical Prince Master Hacks
+        run: |
+          cd ~/orangefox_workspace/device/xiaomi/jasmine_sprout
+          
+          # Force A-Only Configuration
+          sed -i 's/AB_OTA_UPDATER := true/AB_OTA_UPDATER := false/g' BoardConfig.mk || true
+          echo "OF_AB_DEVICE := 0" >> BoardConfig.mk
+          
+          # Clean FSTAB and Remove SD Card
+          find . -type f -name "*.fstab" -o -name "*.flags" | xargs sed -i 's/,slotselect//g' || true
+          find . -type f -name "*.fstab" -o -name "*.flags" | xargs sed -i '/external_sd/d' || true
+          find . -type f -name "*.fstab" -o -name "*.flags" | xargs sed -i '/sdcard1/d' || true
+          
+          # Force Props (MTP, OTG, Mount, LOS 18.1 Sync)
+          cat <<EOF >> system.prop
+          ro.orangefox.force_mtp=1
+          ro.orangefox.disable_shot_check=1
+          persist.sys.usb.config=mtp,adb
+          ro.build.version.release=11
+          ro.build.version.sdk=30
+          EOF
+
+      - name: Compile Recovery
+        run: |
+          cd ~/orangefox_workspace
+          export ALLOW_MISSING_DEPENDENCIES=true
+          export FOX_VERSION="A-Only_Special_V1"
+          export OF_MAINTAINER="TechnicalPrince"
+          export FOX_R11=1
+          source build/envsetup.sh
+          lunch omni_jasmine_sprout-eng
+          mka recoveryimage
+
+      - name: Upload Final ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: OrangeFox-MiA2-AOnly-Final
+          path: ~/orangefox_workspace/out/target/product/jasmine_sprout/OrangeFox-*.zip
