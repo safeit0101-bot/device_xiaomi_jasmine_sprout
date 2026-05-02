@@ -31,7 +31,7 @@ jobs:
           cd ~/orangefox_workspace
           git config --global user.name "TechnicalPrince"
           git config --global user.email "technicalprince@example.com"
-          repo init -u https://github.com/OrangeFoxRecovery/Manifest.git -b fox_11.0 --depth=1
+          repo init -u https://github.com/OrangeFox/Manifest.git -b fox_11.0 --depth=1
           repo sync -c -j$(nproc --all) --force-sync --no-clone-bundle --no-tags
 
       - name: Clone Your Imported Device Tree
